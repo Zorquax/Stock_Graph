@@ -7,7 +7,7 @@ import streamlit as st
 
 yf.pdr_override()
 
-#Run with "streamlit realmain.py" where file is located, in terminal 
+#Run with "streamlit run realmain.py" where file is located, in terminal, or "python -m streamlit run realmain.py" 
 
 class StockStuff:
 	
