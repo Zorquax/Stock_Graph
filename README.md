@@ -1,10 +1,9 @@
-Stock quick visualization.
+This code displays stock data graphed out on the basis of percentage and price difference, based on inputs of: stock tickers, and start and end dates. 
 
 Uses streamlit for visual interface + buttons to choose options
 Uses plotly for the graphs plotted within streamlit - interactive
 Uses pandas dataframe as input for plotly to plot
 Uses yahoo finance to retrieve stock data, via pandas datareader
-Uses mySQL to store and keep data(?)
 
 First, enter the stock(s) tickers you would like to input, with a comma as the delimiter
 <img width="711" alt="image" src="https://github.com/Zorquax/Stock_Graph/assets/55953710/57c731f7-54e2-46ae-b380-d6ef1abebaf5">
