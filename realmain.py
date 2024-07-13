@@ -79,6 +79,7 @@ for stoc in stocklist:
 if len(StockStuff.invalid) > 0:
 	st.write(f'Invalid stocks listed: {StockStuff.invalid}')
 stock_with_data = []
+
 for stock in stocklist:
 	if stock in StockStuff.invalid:
 		continue
