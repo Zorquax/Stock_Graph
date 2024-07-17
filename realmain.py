@@ -7,7 +7,7 @@ import streamlit as st
 
 yf.pdr_override()
 
-#Run with "streamlit realmain.py" where file is located, in terminal 
+#Run with "streamlit run realmain.py" where file is located, in terminal 
 
 class StockStuff:
 	
@@ -16,22 +16,35 @@ class StockStuff:
 	@classmethod
 	def getStock(cls, stock, start, end):
 			try:
-				start = str(start)
-				end = str(end)
+				# start = str(start)
+				# end = str(end)
 				temp = stock
 				stock = cls.convertDuplicateStock(stock)
+
 				data = pdr.data.get_data_yahoo(stock, start = str(start), end = str(end))
 				data["Stock Name"] = [stock] * data.shape[0] if temp == stock else [temp] * data.shape[0]
-				#data.insert(0, 'Stock Name', stock)
+				
 				start_open = data.iloc[0]['Close']
 				start_date = data.index[0]
 				e = list(map(lambda x: (x-start_date).days , data.index))
+
+				data["Stock Range"] = data["Stock Name"] + f" ({start.strftime("%m/%d/%Y")} TO {end.strftime("%m/%d/%Y")})" 
+
 				data['Date'] = data.index.date
 				data.index = e
 				data.index.name = 'Days Since Start'
 				data['Price Difference from Start'] = data['Close'] - start_open
 				data['Percentage Difference'] = ((data['Price Difference from Start'] / start_open) * 100)
 				data['Percentage Format'] = data['Percentage Difference'].map('{:.2f}%'.format)
+
+				data["Hover"] = data["Stock Name"] + ", " + data["Percentage Format"] + ", " + data.index.astype(str)
+
+				data["Temp Price"] = data["Price Difference from Start"].apply(lambda x: f"${x:.2f}")
+
+				data["Hover Stock"] = data["Stock Name"] + ", " + data["Temp Price"] + ", " + data.index.astype(str)
+
+				print(data["Hover Stock"])
+
 				return data
 			except Exception as error:
 				print(error)
@@ -80,34 +93,50 @@ if len(StockStuff.invalid) > 0:
 	st.write(f'Invalid stocks listed: {StockStuff.invalid}')
 stock_with_data = []
 
+some_dict = {}
+
 for stock in stocklist:
 	if stock in StockStuff.invalid:
 		continue
-	start = st.date_input(f'What would you like the start date for {stock} to be?', 
-						dt.datetime.now() - dt.timedelta(days=30), min_value=dt.datetime(1981,1,1))
-	end = st.date_input(f'What would you like the end date for {stock} to be?', 
-						dt.datetime.now(), min_value=start, max_value = dt.datetime.now()) + dt.timedelta(1)
-	stock_with_data.append([stock, start, end])
+
+	if "begin" in some_dict: 
+		start = st.text_input(f'What would you like the start date for {stock} to be?', value = some_dict["begin"])
+	else:
+		start = st.text_input(f'What would you like the start date for {stock} to be?', value = (dt.datetime.now() - dt.timedelta(days=30)).strftime("%m/%d/%Y"))
+		some_dict["begin"] = start
+	
+	if "ending" in some_dict: 
+		end = st.text_input(f'What would you like the end date for {stock} to be?', value = some_dict["ending"])
+	else:
+		end = st.text_input(f'What would you like the end date for {stock} to be?', value = dt.datetime.now().strftime("%m/%d/%Y"))
+		some_dict["ending"] = end 
+	real_start = dt.datetime.strptime(start, "%m/%d/%Y").date()
+	real_end = dt.datetime.strptime(end, "%m/%d/%Y").date()
+	stock_with_data.append([stock, real_start, real_end])
 
 if st.button("Generate stock data"):
 	data2 = StockStuff.createFullData(stock_with_data)
 
-	data1 = data2[["Close", "Stock Name", "Price Difference from Start", "Percentage Difference", "Percentage Format", "Date"]]
+	data1 = data2[["Close", "Stock Name", "Stock Range", "Hover", "Hover Stock", "Price Difference from Start", "Percentage Difference", "Percentage Format", "Date"]]
+
+	print(data1["Hover"])
 
 	data1['Stock Price'] = data1['Close'].apply(lambda x: f"${x:.2f}")
 
-	fig = px.line(data1, color = 'Stock Name', markers = True, hover_name = "Stock Price", hover_data = {
-		"Stock Name" : True, "Date": True, "Price Difference from Start" : ":.2f", "value": False, "variable" : False,
-		"Percentage Difference" : ":.2f", "Percentage Format" : False}, 
-		title = "Stock Values")
 	min_percent = data1["Percentage Difference"].min()
 	max_percent = data1["Percentage Difference"].max()
-	fig2 = px.line(data1, y = "Percentage Difference", color = 'Stock Name', markers = True, hover_name = "Percentage Format", hover_data = {
-		"Date": True,"Percentage Difference" : ":.2f", "Stock Name" : True, "Stock Price" : True, "Price Difference from Start" : ":.2f"}, 
-		title = "Percentage Gain", range_y = (min_percent-1,max_percent+1))
 
-	st.plotly_chart(fig2, use_container_width=True)
+	fig = px.line(data1, y = "Percentage Difference", color = 'Stock Range', markers = True, hover_name = "Hover", hover_data = {
+		"Hover": False, "Hover Stock": False, "Date": True,"Percentage Difference" : ":.2f", "Stock Name" : True, "Stock Range" : False, "Stock Price" : True, "Price Difference from Start" : ":.2f"}, 
+		title = f"Percentage Gain - {stocklist}", range_y = (min_percent-1,max_percent+1))
+
+	fig2 = px.line(data1, color = 'Stock Range', markers = True, hover_name = "Hover Stock", hover_data = {
+		"Hover": False, "Hover Stock": False, "Stock Name" : True, "Stock Price": False, "Date": True, "Price Difference from Start" : ":.2f", "value": False, "variable" : False,
+		"Percentage Difference" : ":.2f", "Percentage Format" : False, "Stock Range" : False}, 
+		title = "Stock Values")
+
 	st.plotly_chart(fig, use_container_width=True)
+	st.plotly_chart(fig2, use_container_width=True)
 
 	# Table
 
