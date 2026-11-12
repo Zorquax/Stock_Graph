@@ -12,6 +12,8 @@ yf.pdr_override()
 class StockStuff:
 	
 	invalid = []
+	d = {}
+	investment_total = pd.DataFrame()
 
 	@classmethod
 	def getStock(cls, stock, start, end):
@@ -20,6 +22,7 @@ class StockStuff:
 				# end = str(end)
 				temp = stock
 				stock = cls.convertDuplicateStock(stock)
+				print(stock)
 
 				data = pdr.data.get_data_yahoo(stock, start = str(start), end = str(end))
 				data["Stock Name"] = [stock] * data.shape[0] if temp == stock else [temp] * data.shape[0]
@@ -43,12 +46,51 @@ class StockStuff:
 
 				data["Hover Stock"] = data["Stock Name"] + ", " + data["Temp Price"] + ", " + data.index.astype(str)
 
-				print(data["Hover Stock"])
+				data["Investing"] = StockStuff.d[stock] * (data['Percentage Difference'] / 100)
+
+				# if StockStuff.investment_total.empty:
+				# 	StockStuff.investment_total = data["Investing"]
+				# else: 
+				# 	StockStuff.investment_total += data["Investing"]
 
 				return data
 			except Exception as error:
 				print(error)
 				print("Not a valid stock acronym - try again \n")
+	
+	@classmethod
+	def calculateInvestmentTotals(cls, stock_df):
+		# Ensure that the DataFrame index is correctly set to 'Days Since Start'
+		stock_df.reset_index(inplace=True)
+		
+		# Group by 'Days Since Start' and sum up the 'Investing' values
+		grouped_totals = stock_df.groupby('Days Since Start')['Investing'].sum().reset_index()
+		
+		# Rename columns for clarity
+		grouped_totals.columns = ['Days Since Start', 'Investment Totals']
+		
+		# Set 'Days Since Start' as the index
+		grouped_totals.set_index('Days Since Start', inplace=True)
+		
+		return grouped_totals
+	
+	@classmethod
+	def createPortfolio(cls, stock_df):
+		try:
+			print(stock_df)
+			# Calculate the investment totals for each day across all stocks
+			investment_totals_df = cls.calculateInvestmentTotals(stock_df)
+
+			# Display or further process the investment_totals_df as needed
+			print(investment_totals_df)
+
+			# For demonstration, you could merge this with the original dataframe if needed
+			# stock_df = stock_df.merge(investment_totals_df, on='Days Since Start', how='left')
+
+		except Exception as error:
+			print(error)
+			print("Something went wrong when attempting to create the portfolio.")
+
 	
 	@classmethod
 	def convertDuplicateStock(cls, stock):
@@ -79,8 +121,12 @@ class StockStuff:
 		for stock, start, end in stock_with_data:
 			if stock not in cls.invalid:
 				res.append(cls.getStock(stock, start, end))
+		
 		final = pd.concat(res)
+		print(final)
+		cls.createPortfolio(final)
 		return final
+
 	
 stuck = st.text_input("List of stocks, separated by commas", key = "stock", value = "AAPL",
 					placeholder= "Ticker of stock - E.G AAPL for Apple",
@@ -114,24 +160,32 @@ for stock in stocklist:
 	real_end = dt.datetime.strptime(end, "%m/%d/%Y").date()
 	stock_with_data.append([stock, real_start, real_end])
 
+money = st.number_input("How much money would you like to track over the interval?", 
+						placeholder = "Enter a number in $ amount", step = 100) 
+for stock in stocklist: 
+	if stock in StockStuff.invalid:
+		continue
+	value = st.number_input(f'What % of the money would you like to have for {stock}') / 100
+	StockStuff.d[stock] = value * money 
+
+st.write(StockStuff.d)
+
 if st.button("Generate stock data"):
 	data2 = StockStuff.createFullData(stock_with_data)
 
-	data1 = data2[["Close", "Stock Name", "Stock Range", "Hover", "Hover Stock", "Price Difference from Start", "Percentage Difference", "Percentage Format", "Date"]]
-
-	print(data1["Hover"])
+	data1 = data2[["Close", "Stock Name", "Stock Range", "Hover", "Hover Stock", "Price Difference from Start", "Percentage Difference", "Percentage Format", "Date", "Investing"]]
 
 	data1['Stock Price'] = data1['Close'].apply(lambda x: f"${x:.2f}")
 
 	min_percent = data1["Percentage Difference"].min()
 	max_percent = data1["Percentage Difference"].max()
 
-	fig = px.line(data1, y = "Percentage Difference", color = 'Stock Range', markers = True, hover_name = "Hover", hover_data = {
-		"Hover": False, "Hover Stock": False, "Date": True,"Percentage Difference" : ":.2f", "Stock Name" : True, "Stock Range" : False, "Stock Price" : True, "Price Difference from Start" : ":.2f"}, 
+	fig = px.line(data1, y = "Percentage Difference", color = 'Stock Range', markers = False, hover_name = "Hover", hover_data = {
+		"Hover": False, "Hover Stock": False, "Date": True,"Percentage Difference" : ":.2f", "Stock Name" : True, "Stock Range" : False, "Stock Price" : True, "Price Difference from Start" : ":.2f", "Investing" : ":.2f"}, 
 		title = f"Percentage Gain - {stocklist}", range_y = (min_percent-1,max_percent+1))
 
-	fig2 = px.line(data1, color = 'Stock Range', markers = True, hover_name = "Hover Stock", hover_data = {
-		"Hover": False, "Hover Stock": False, "Stock Name" : True, "Stock Price": False, "Date": True, "Price Difference from Start" : ":.2f", "value": False, "variable" : False,
+	fig2 = px.line(data1, color = 'Stock Range', markers = False, hover_name = "Hover Stock", hover_data = {
+		"Hover": False, "Hover Stock": False, "Stock Name" : True, "Stock Price": True, "Date": True, "Price Difference from Start" : ":.2f", "value": False, "variable" : False, "Investing" : ":.2f",
 		"Percentage Difference" : ":.2f", "Percentage Format" : False, "Stock Range" : False}, 
 		title = "Stock Values")
 
